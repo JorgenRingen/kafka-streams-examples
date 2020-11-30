@@ -20,6 +20,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Produced;
@@ -169,7 +170,9 @@ public class WordCountLambdaExample {
     streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
     // Records should be flushed every 10 seconds. This is less than the default
     // in order to keep this example interactive.
-    streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
+//        streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
+      // For illustrative purposes we disable record caches.
+      streamsConfiguration.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.EXACTLY_ONCE);
     // For illustrative purposes we disable record caches.
     streamsConfiguration.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
     // Use a temporary directory for storing state, which will be automatically removed after the test.
@@ -183,28 +186,8 @@ public class WordCountLambdaExample {
    * @param builder StreamsBuilder to use
    */
   static void createWordCountStream(final StreamsBuilder builder) {
-    // Construct a `KStream` from the input topic "streams-plaintext-input", where message values
-    // represent lines of text (for the sake of this example, we ignore whatever may be stored
-    // in the message keys).  The default key and value serdes will be used.
-    final KStream<String, String> textLines = builder.stream(inputTopic);
-
-    final Pattern pattern = Pattern.compile("\\W+", Pattern.UNICODE_CHARACTER_CLASS);
-
-    final KTable<String, Long> wordCounts = textLines
-      // Split each text line, by whitespace, into words.  The text lines are the record
-      // values, i.e. we can ignore whatever data is in the record keys and thus invoke
-      // `flatMapValues()` instead of the more generic `flatMap()`.
-      .flatMapValues(value -> Arrays.asList(pattern.split(value.toLowerCase())))
-      // Group the split data by word so that we can subsequently count the occurrences per word.
-      // This step re-keys (re-partitions) the input data, with the new record key being the words.
-      // Note: No need to specify explicit serdes because the resulting key and value types
-      // (String and String) match the application's default serdes.
-      .groupBy((keyIgnored, word) -> word)
-      // Count the occurrences of each word (record key).
-      .count();
-
-    // Write the `KTable<String, Long>` to the output topic.
-    wordCounts.toStream().to(outputTopic, Produced.with(Serdes.String(), Serdes.Long()));
+      builder.stream(inputTopic)
+              .peek((key, value) -> System.out.println("key=" + key + " value=" + value));
   }
 
 }
